@@ -35,13 +35,13 @@ SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1nK7Z_KLPML52WPnOztTOrR
 # ======================================
 
 def load_data_and_skus():
-    """Load data from Google Sheets and extract all unique SKUs - MANUAL REFRESH ONLY"""
+    """Load data from Google Sheets and extract all unique PRODUCTs - MANUAL REFRESH ONLY"""
     try:
         df = pd.read_csv(SHEET_URL)
         df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%d %H.%M.%S", errors="coerce")
         
-        # Extract all unique SKUs from real data
-        unique_skus = df["sku"].dropna().unique().tolist()
+        # Extract all unique PRODUCTs from real data
+        unique_skus = df["product"].dropna().unique().tolist()
         unique_skus.sort()  # Sort alphabetically
         
         return df, unique_skus, None  # Return success
@@ -49,7 +49,7 @@ def load_data_and_skus():
         return None, le.classes_.tolist(), str(e)  # Return error
 
 def get_sku_encoded(sku, unique_skus):
-    """Get encoded value for SKU, with fallback for unknown SKUs"""
+    """Get encoded value for PRODUCT, with fallback for unknown PRODUCTs"""
     try:
         return le.transform([sku])[0]
     except:
@@ -121,7 +121,7 @@ with col2:
                 st.session_state.last_refresh = datetime.now()
                 st.session_state.data_error = None
                 st.session_state.data_loaded = True
-                st.success(f"✅ Data refreshed! Found {len(dynamic_skus)} unique SKUs")
+                st.success(f"✅ Data refreshed! Found {len(dynamic_skus)} unique PRODUCTs")
                 st.rerun()
             else:
                 st.session_state.data_error = error
@@ -152,7 +152,7 @@ if not st.session_state.data_loaded:
             st.session_state.dynamic_skus = dynamic_skus
             st.session_state.last_refresh = datetime.now()
             st.session_state.data_loaded = True
-            st.success(f"✅ Initial data loaded! Found {len(dynamic_skus)} unique SKUs")
+            st.success(f"✅ Initial data loaded! Found {len(dynamic_skus)} unique PRODUCTs")
         else:
             st.session_state.data_error = error
             st.error(f"❌ Error loading initial data: {error}")
@@ -167,14 +167,14 @@ with st.sidebar:
     
     if st.session_state.data_loaded and df_main is not None:
         st.success("✅ Data Loaded")
-        st.metric("📦 Total SKUs", len(dynamic_skus))
+        st.metric("📦 Total PRODUCTs", len(dynamic_skus))
         st.metric("📊 Total Records", len(df_main))
         
         if st.session_state.last_refresh:
             st.write(f"**Last Refresh:** {st.session_state.last_refresh.strftime('%d/%m/%Y %H:%M:%S')}")
         
-        # Show recent SKUs
-        st.write("**Recent SKUs:**")
+        # Show recent PRODUCTs
+        st.write("**Recent PRODUCTs:**")
         for i, sku in enumerate(dynamic_skus[:8]):
             st.write(f"{i+1}. {sku}")
         if len(dynamic_skus) > 8:
@@ -212,7 +212,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # Tab 1: ENHANCED MONITORING
 # ================================
 with tab1:
-    st.subheader("📡 Monitoring Harian (All SKUs)")
+    st.subheader("📡 Monitoring Harian (All PRODUCTs)")
     
     if df_main is not None:
         # Filter today's data
@@ -222,7 +222,7 @@ with tab1:
         if df_today.empty:
             st.warning("⚠️ Tidak ada data penjualan untuk hari ini.")
             # Show recent data as fallback
-            recent_data = df_main.tail(20)
+            recent_data = df_main.head(20)
             st.write("**Data Terbaru (20 records):**")
             st.dataframe(recent_data)
         else:
@@ -235,20 +235,20 @@ with tab1:
             with c2:
                 st.metric("💧 Kelembaban (%)", f"{latest['humidity']}")
             with c3:
-                st.metric("📊 SKUs Terjual Hari Ini", len(df_today["sku"].unique()))
+                st.metric("📊 PRODUCTs Terjual Hari Ini", len(df_today["product"].unique()))
             
-            # 🔥 AGGREGATE ALL SKUs FROM TODAY'S DATA
-            sales_today = df_today.groupby("sku").agg({
+            # 🔥 AGGREGATE ALL PRODUCTs FROM TODAY'S DATA
+            sales_today = df_today.groupby("product").agg({
                 "sold": "sum",
                 "price": "mean"
             }).reset_index()
             
-            # Generate predictions for all SKUs that had sales today
+            # Generate predictions for all PRODUCTs that had sales today
             preds = []
             tomorrow = pd.Timestamp.today() + pd.Timedelta(days=1)
             
             for _, row in sales_today.iterrows():
-                sku_encoded = get_sku_encoded(row["sku"], dynamic_skus)
+                sku_encoded = get_sku_encoded(row["product"], dynamic_skus)
                 
                 features = pd.DataFrame([{
                     "avg_price": row["price"],
@@ -261,7 +261,7 @@ with tab1:
                 pred = predict_sales(features)
                 
                 preds.append({
-                    "SKU": row["sku"],
+                    "product": row["product"],
                     "Terjual Hari Ini": int(row["sold"]),
                     "Harga Rata-rata": f"Rp {row['price']:,.0f}",
                     "Prediksi Besok": round(float(pred[0]), 2)
@@ -270,15 +270,15 @@ with tab1:
             # Sort by sales descending
             preds = sorted(preds, key=lambda x: x["Terjual Hari Ini"], reverse=True)
             
-            st.markdown("### 📊 Ringkasan Penjualan Harian & Prediksi Besok (Semua SKU)")
+            st.markdown("### 📊 Ringkasan Penjualan Harian & Prediksi Besok (Semua PRODUCT)")
             st.dataframe(pd.DataFrame(preds), use_container_width=True)
             
-            # 🔥 SHOW ALL UNIQUE SKUs FROM DATA
-            st.markdown("### 📦 Semua SKU yang Tersedia di Database")
+            # 🔥 SHOW ALL UNIQUE PRODUCTs FROM DATA
+            st.markdown("### 📦 Semua PRODUCT yang Tersedia di Database")
             sku_df = pd.DataFrame({
                 "No": range(1, len(dynamic_skus) + 1),
-                "SKU": dynamic_skus,
-                "Status": ["✅ Active" if sku in sales_today["sku"].values else "⏸️ No Sales Today" for sku in dynamic_skus]
+                "product": dynamic_skus,
+                "Status": ["✅ Active" if sku in sales_today["product"].values else "⏸️ No Sales Today" for sku in dynamic_skus]
             })
             st.dataframe(sku_df, use_container_width=True)
             
@@ -291,10 +291,10 @@ with tab1:
 # Tab 2: DYNAMIC PREDIKSI PER PRODUK
 # ================================
 with tab2:
-    st.subheader("🔮 Prediksi per Produk (Dynamic SKU)")
+    st.subheader("🔮 Prediksi per Produk (Dynamic PRODUCT)")
     
-    # 🔥 USE DYNAMIC SKUs INSTEAD OF STATIC le.classes_
-    sku = st.selectbox("Pilih Produk (SKU)", dynamic_skus, key="tab2_sku")
+    # 🔥 USE DYNAMIC PRODUCTs INSTEAD OF STATIC le.classes_
+    sku = st.selectbox("Pilih Produk (PRODUCT)", dynamic_skus, key="tab2_sku")
     avg_price = st.number_input("Harga Rata-rata", min_value=1000, max_value=20000, value=10000, step=500)
     pred_scope = st.radio("Pilih Periode Prediksi", ["Harian", "Mingguan", "Bulanan"])
     
@@ -325,13 +325,13 @@ with tab2:
 # Tab 3: DYNAMIC PREDIKSI BESOK
 # ================================
 with tab3:
-    st.subheader("📊 Prediksi Penjualan Besok (All Dynamic SKUs)")
+    st.subheader("📊 Prediksi Penjualan Besok (All Dynamic PRODUCTs)")
     
-    st.info(f"📦 Total SKUs available: {len(dynamic_skus)}")
+    st.info(f"📦 Total PRODUCTs available: {len(dynamic_skus)}")
     
     # Auto-populate with recent sales data if available
     if df_main is not None and not df_main.empty:
-        recent_sales = df_main.groupby("sku").agg({
+        recent_sales = df_main.groupby("product").agg({
             "price": "mean",
             "sold": "mean"
         }).round(0).to_dict()
@@ -340,9 +340,9 @@ with tab3:
     
     input_today = {}
     
-    # Create inputs for ALL dynamic SKUs
+    # Create inputs for ALL dynamic PRODUCTs
     for i, sku in enumerate(dynamic_skus):
-        with st.expander(f"📦 {sku} (SKU #{i+1})"):
+        with st.expander(f"📦 {sku} (PRODUCT #{i+1})"):
             c1, c2 = st.columns(2)
             
             with c1:
@@ -369,7 +369,7 @@ with tab3:
             
             input_today[sku] = {"price": price, "sold": sold}
     
-    if st.button("🔮 Prediksi Besok (Semua SKU)"):
+    if st.button("🔮 Prediksi Besok (Semua PRODUCT)"):
         preds = []
         tomorrow = pd.Timestamp.today() + pd.Timedelta(days=1)
         
@@ -386,7 +386,7 @@ with tab3:
             
             pred = predict_sales(features)
             preds.append({
-                "SKU": sku, 
+                "product": sku, 
                 "Input Harga": f"Rp {vals['price']:,}",
                 "Input Sold Today": vals["sold"],
                 "Prediksi Besok": round(float(pred[0]), 2)
@@ -400,9 +400,9 @@ with tab3:
 # Tab 4: DYNAMIC PREDIKSI MINGGU
 # ================================
 with tab4:
-    st.subheader("📅 Prediksi Penjualan Minggu Depan (All Dynamic SKUs)")
+    st.subheader("📅 Prediksi Penjualan Minggu Depan (All Dynamic PRODUCTs)")
     
-    st.info(f"📦 Predicting for {len(dynamic_skus)} SKUs")
+    st.info(f"📦 Predicting for {len(dynamic_skus)} PRODUCTs")
     
     input_today = {}
     
@@ -410,14 +410,14 @@ with tab4:
     st.markdown("### ⚡ Quick Batch Input")
     c1, c2 = st.columns(2)
     with c1:
-        batch_price = st.number_input("Default Price for All SKUs", value=10000, step=500, key="batch_price_minggu")
+        batch_price = st.number_input("Default Price for All PRODUCTs", value=10000, step=500, key="batch_price_minggu")
     with c2:
-        batch_sold = st.number_input("Default Sold Today for All SKUs", value=1, step=1, key="batch_sold_minggu")
+        batch_sold = st.number_input("Default Sold Today for All PRODUCTs", value=1, step=1, key="batch_sold_minggu")
     
     if st.button("Apply Batch Values"):
         st.session_state.apply_batch_minggu = True
     
-    # Individual inputs for each SKU
+    # Individual inputs for each PRODUCT
     for i, sku in enumerate(dynamic_skus):
         c1, c2 = st.columns(2)
         
@@ -461,7 +461,7 @@ with tab4:
             
             pred = predict_sales(features)
             preds.append({
-                "SKU": sku, 
+                "product": sku, 
                 "Prediksi Mingguan": round(float(pred[0] * 7), 2)
             })
         
@@ -472,9 +472,9 @@ with tab4:
 # Tab 5: DYNAMIC PREDIKSI BULAN
 # ================================
 with tab5:
-    st.subheader("📆 Prediksi Penjualan Bulan Depan (All Dynamic SKUs)")
+    st.subheader("📆 Prediksi Penjualan Bulan Depan (All Dynamic PRODUCTs)")
     
-    st.info(f"📦 Predicting for {len(dynamic_skus)} SKUs")
+    st.info(f"📦 Predicting for {len(dynamic_skus)} PRODUCTs")
     
     input_today = {}
     
@@ -482,9 +482,9 @@ with tab5:
     st.markdown("### ⚡ Quick Batch Input")
     c1, c2 = st.columns(2)
     with c1:
-        batch_price = st.number_input("Default Price for All SKUs", value=10000, step=500, key="batch_price_bulan")
+        batch_price = st.number_input("Default Price for All PRODUCTs", value=10000, step=500, key="batch_price_bulan")
     with c2:
-        batch_sold = st.number_input("Default Sold Today for All SKUs", value=1, step=1, key="batch_sold_bulan")
+        batch_sold = st.number_input("Default Sold Today for All PRODUCTs", value=1, step=1, key="batch_sold_bulan")
     
     if st.button("Apply Batch Values", key="batch_bulan"):
         st.session_state.apply_batch_bulan = True
@@ -532,7 +532,7 @@ with tab5:
             
             pred = predict_sales(features)
             preds.append({
-                "SKU": sku, 
+                "product": sku, 
                 "Prediksi Bulanan": round(float(pred[0] * 30), 2)
             })
         
@@ -543,9 +543,9 @@ with tab5:
 # Tab 6: ENHANCED FILE UPLOAD
 # ================================
 with tab6:
-    st.subheader("📂 Upload File XLSX untuk Prediksi (Dynamic SKU Support)")
+    st.subheader("📂 Upload File XLSX untuk Prediksi (Dynamic PRODUCT Support)")
     
-    st.info(f"📦 System recognizes {len(dynamic_skus)} unique SKUs from database")
+    st.info(f"📦 System recognizes {len(dynamic_skus)} unique PRODUCTs from database")
     
     uploaded_file = st.file_uploader("Upload file Excel (.xlsx)", type=["xlsx"])
     
@@ -553,25 +553,25 @@ with tab6:
         try:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             st.success("✅ File berhasil dibaca")
-            st.dataframe(df.head())
+            st.dataframe(df.head(10))
             
-            # Check SKUs in uploaded file vs database
-            file_skus = df["sku"].unique() if "sku" in df.columns else []
-            st.markdown("### 📊 SKU Analysis")
+            # Check PRODUCTs in uploaded file vs database
+            file_skus = df["product"].unique() if "product" in df.columns else []
+            st.markdown("### 📊 PRODUCT Analysis")
             
             c1, c2 = st.columns(2)
             with c1:
-                st.write("**SKUs in File:**")
+                st.write("**PRODUCTs in File:**")
                 for sku in file_skus:
                     status = "✅" if sku in dynamic_skus else "❓"
                     st.write(f"{status} {sku}")
             
             with c2:
-                st.write("**SKU Status:**")
+                st.write("**PRODUCT Status:**")
                 known = sum(1 for sku in file_skus if sku in dynamic_skus)
                 unknown = len(file_skus) - known
-                st.metric("Known SKUs", known)
-                st.metric("Unknown SKUs", unknown)
+                st.metric("Known PRODUCTs", known)
+                st.metric("Unknown PRODUCTs", unknown)
             
             mode = st.radio("Pilih Mode Prediksi", ["Harian", "Mingguan", "Bulanan"])
             
@@ -580,7 +580,7 @@ with tab6:
                 tomorrow = pd.Timestamp.today() + pd.Timedelta(days=1)
                 
                 for _, row in df.iterrows():
-                    sku_encoded = get_sku_encoded(row["sku"], dynamic_skus)
+                    sku_encoded = get_sku_encoded(row["product"], dynamic_skus)
                     
                     features = pd.DataFrame([{
                         "avg_price": row["price"],
@@ -599,11 +599,11 @@ with tab6:
                         factor = 30
                     
                     preds.append({
-                        "SKU": row["sku"], 
+                        "product": row["product"], 
                         "Input Price": f"Rp {row['price']:,}",
                         "Input Sold": row["sold"],
                         f"Prediksi {mode}": round(float(pred[0] * factor), 2),
-                        "SKU Status": "✅ Known" if row["sku"] in dynamic_skus else "❓ New"
+                        "PRODUCT Status": "✅ Known" if row["product"] in dynamic_skus else "❓ New"
                     })
                 
                 st.table(pd.DataFrame(preds))
@@ -616,7 +616,7 @@ with tab6:
 # FOOTER INFO
 # ================================
 st.markdown("---")
-status_text = f"**📊 System Status:** {len(dynamic_skus)} Dynamic SKUs Loaded | 🔄 Manual Refresh Mode"
+status_text = f"**📊 System Status:** {len(dynamic_skus)} Dynamic PRODUCTs Loaded | 🔄 Manual Refresh Mode"
 if st.session_state.last_refresh:
     status_text += f" | Last Updated: {st.session_state.last_refresh.strftime('%H:%M:%S')}"
 
